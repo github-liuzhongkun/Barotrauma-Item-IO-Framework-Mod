@@ -36,9 +36,9 @@ namespace BaroMod_sjx
 
 
 
-		static Dictionary<Type, ItemComponent> get_componentsByType(Item item)
-		{
-			return (AccessTools.Field(typeof(Item), "componentsByType").GetValue(item)! as Dictionary<Type, ItemComponent>)!;
+		static Dictionary<Type, List<ItemComponent>> get_componentsByType(Item item)
+		{ 
+			return (AccessTools.Field(typeof(Item), "componentsByType").GetValue(item)! as Dictionary<Type, List<ItemComponent>>)!; 
 		}
 
 		[HarmonyPatch(typeof(Inventory))]
