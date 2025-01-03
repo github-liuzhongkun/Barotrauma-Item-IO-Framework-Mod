@@ -85,9 +85,9 @@ namespace BaroMod_sjx
 			public static bool Prefix(out context? __state,
 				SpriteBatch spriteBatch, Inventory inventory, VisualSlot slot, Item item, int slotIndex)
 			{
-				if (inventory != null && item != null && get_componentsByType(item).TryGetValue(typeof(ConditionStorage), out ItemComponent? comp))
+				if (inventory != null && item != null && get_componentsByType(item).TryGetValue(typeof(ConditionStorage), out List<ItemComponent>? comps))
 				{
-					ConditionStorage conditionStorage = (comp as ConditionStorage)!;
+					ConditionStorage conditionStorage = (comps.First() as ConditionStorage)!;
 					if (!conditionStorage.showIcon && !conditionStorage.showCount)
 					{
 						__state = null;
