@@ -18,7 +18,10 @@
 			<HintPath>..\Refs\0Harmony.dll</HintPath>
 		</Reference>
 		<Reference Include="DedicatedServer">
-		  <HintPath>..\Refs\Server\DedicatedServer.dll</HintPath>
+			<HintPath>..\Refs\Windows\DedicatedServer.dll</HintPath>
+		</Reference>
+		<Reference Include="BarotraumaCore">
+			<HintPath>..\Refs\Windows\BarotraumaCore.dll</HintPath>
 		</Reference>
 		<Reference Include="MonoGame.Framework.Windows.NetStandard">
 			<HintPath>..\Refs\MonoGame.Framework.Windows.NetStandard.dll</HintPath>

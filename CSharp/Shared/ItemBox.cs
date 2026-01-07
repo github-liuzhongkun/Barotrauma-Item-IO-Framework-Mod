@@ -1,4 +1,4 @@
-﻿using Barotrauma;
+using Barotrauma;
 using HarmonyLib;
 using System.Reflection;
 using System.Linq;
@@ -8,10 +8,11 @@ using System;
 using Microsoft.Xna.Framework;
 using System.ComponentModel;
 using Barotrauma.Networking;
+using Barotrauma.Extensions;
 
 namespace BaroMod_sjx
 {
-	partial class ItemBoxImpl : ACsMod
+	partial class ItemBoxImpl : IAssemblyPlugin
 	{
 		const string harmony_id = "com.sjx.ItemIOFramework";
 		/*
@@ -20,25 +21,33 @@ namespace BaroMod_sjx
 		const int item_count = 1024;
 		const float increment = max_condition / item_count;
 		*/
-		private readonly Harmony harmony;
+		private Harmony? harmony;
 
-		public ItemBoxImpl()
+		public void Initialize()
 		{
 			harmony = new Harmony(harmony_id);
 			harmony.PatchAll(Assembly.GetExecutingAssembly());
-			Barotrauma.DebugConsole.AddWarning("Loaded ItemBox Impl");
+			LuaCsLogger.Log("ItemBox loaded!");
 		}
 
-		public override void Stop()
+		public void OnLoadCompleted()
 		{
-			harmony.UnpatchSelf();
 		}
 
+		public void PreInitPatching()
+		{
+		}
 
+		public void Dispose()
+		{
+			harmony?.UnpatchSelf();
+			harmony = null;
+			LuaCsLogger.Log("ItemBox disposed!");
+		}
 
-		static Dictionary<Type, List<ItemComponent>> get_componentsByType(Item item)
-		{ 
-			return (AccessTools.Field(typeof(Item), "componentsByType").GetValue(item)! as Dictionary<Type, List<ItemComponent>>)!; 
+		static Dictionary<Type, List<ItemComponent>> GetComponentsByType(Item item)
+		{
+			return (AccessTools.Field(typeof(Item), "componentsByType").GetValue(item)! as Dictionary<Type, List<ItemComponent>>)!;
 		}
 
 		[HarmonyPatch(typeof(Inventory))]
@@ -50,28 +59,28 @@ namespace BaroMod_sjx
 				return AccessTools.Method(typeof(Inventory), "PutItem");
 			}
 
-			public class context
+			public class Context
 			{
 				public Character user;
 				public ConditionStorage target;
-				public context(Character user, ConditionStorage target)
+				public Context(Character user, ConditionStorage target)
 				{
 					this.user = user;
 					this.target = target;
 				}
 			}
 
-			public static bool Prefix(Inventory __instance, Character user, int i, out context? __state)
+			public static bool Prefix(Inventory __instance, Character user, int i, out Context? __state)
 			{
 				__state = null;
 				ConditionStorage? target = ConditionStorage.GetFromInventory(__instance);
 				if (target != null && i == target.slotIndex)
 				{
-					__state = new context(user, target);
+					__state = new Context(user, target);
 				}
 				return true;
 			}
-			public static void Postfix(context? __state)
+			public static void Postfix(Context? __state)
 			{
 				if (__state != null)
 				{
@@ -230,8 +239,8 @@ namespace BaroMod_sjx
 					OnCountPredictionChanged();
 				}
 			}
-			IsActive = true;
 			_currentItemCount = value;
+			IsActive = true;
 		}
 
 		public ItemInventory itemInventory => Item.OwnInventory;
@@ -278,15 +287,15 @@ namespace BaroMod_sjx
 
 		public ConditionStorage(Item item, ContentXElement element) : base(item, element) { }
 
-		public bool IsFull => currentItemCount >= maxItemCount;
-		public bool IsEmpty() => currentItemCount <= 0;
+		public bool IsStackFull => currentItemCount >= maxItemCount;
+		public bool IsStackEmpty => currentItemCount <= 0;
 
 		public void SyncItemCount()
 		{
-#if SERVER
-			Item.CreateServerEvent(this, new EventData(currentItemCount));
-#endif
+			CreateSyncItemCountEvent();
 		}
+
+		partial void CreateSyncItemCountEvent();
 
 		public override void Update(float deltaTime, Camera cam)
 		{
@@ -333,29 +342,23 @@ namespace BaroMod_sjx
 
 		public void OnPutItemDone(Character user)
 		{
-			ItemContainer container = itemContainer;
-			Inventory.ItemSlot target_slot;
-			{
-				Inventory.ItemSlot[] slots = (AccessTools.Field(typeof(Inventory), "slots").GetValue(itemInventory)! as Inventory.ItemSlot[])!;
-				if (slotIndex >= slots.Length)
-				{
-					DebugConsole.LogError($"ConditionStorage of {Item.Prefab.Identifier} specified index {slotIndex} out of {slots.Length}!");
-					return;
-				}
-				target_slot = slots[slotIndex];
-			}
+			Inventory.ItemSlot? target_slot = GetSlot();
 
-			if (target_slot.Items.Any())
+			if (target_slot == null) return;
+
+			var targetSlotItems = target_slot.Items;
+			if (targetSlotItems.Any())
 			{
-				QualityStacked = target_slot.Items.First().Quality;
-				ConditionStacked = target_slot.Items.First().Condition;
-				item_type = target_slot.Items.First().Prefab;
-				if (!IsFull)
+				var targetSlotItem = targetSlotItems.First();
+				QualityStacked = targetSlotItem.Quality;
+				ConditionStacked = targetSlotItem.Condition;
+				item_type = targetSlotItem.Prefab;
+				if (!IsStackFull)
 				{
 					//bool edited = false;	
-					int preserve = SlotPreserveCount(target_slot.Items.First().Prefab, itemInventory, container, slotIndex);
-					var it = target_slot.Items.ToArray().AsEnumerable().GetEnumerator();
-					while (it.MoveNext() && !IsFull)
+					int preserve = SlotPreserveCount(item_type, itemInventory, itemContainer, slotIndex);
+					var it = targetSlotItems.GetEnumerator();
+					while (it.MoveNext() && !IsStackFull)
 					{
 						if (preserve > 0)
 						{
@@ -377,16 +380,9 @@ namespace BaroMod_sjx
 
 		public void OnRemoveItemDone()
 		{
-			Inventory.ItemSlot target_slot;
-			{
-				Inventory.ItemSlot[] slots = (AccessTools.Field(typeof(Inventory), "slots").GetValue(itemInventory)! as Inventory.ItemSlot[])!;
-				if (slotIndex >= slots.Length)
-				{
-					DebugConsole.LogError($"ConditionStorage of {(itemInventory.Owner as Item)!.Prefab.Identifier} specified index {slotIndex} out of {slots.Length}!");
-					return;
-				}
-				target_slot = slots[slotIndex];
-			}
+			Inventory.ItemSlot? target_slot = GetSlot();
+
+			if (target_slot == null) return;
 
 			int preserve = SlotPreserveCount(item_type!, itemInventory, itemContainer, slotIndex);
 			int spawn_count = preserve - target_slot.Items.Count;

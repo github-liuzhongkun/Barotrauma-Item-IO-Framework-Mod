@@ -17,7 +17,7 @@ namespace BaroMod_sjx
 		[HarmonyPatch(typeof(Inventory), nameof(Inventory.DrawSlot))]
 		class Patch_DrawSlot
 		{
-			public class context
+			public class Context
 			{
 				public SpriteBatch spriteBatch;
 
@@ -33,7 +33,7 @@ namespace BaroMod_sjx
 				public float sprite_scale;
 				public float rotation;
 				public Color spriteColor;
-				public context(SpriteBatch sb, Inventory inv, Sprite? full, Sprite? empty, Sprite? item, Rectangle area, int max, int cur, Vector2 sp, float ss, float rot, Color sc)
+				public Context(SpriteBatch sb, Inventory inv, Sprite? full, Sprite? empty, Sprite? item, Rectangle area, int max, int cur, Vector2 sp, float ss, float rot, Color sc)
 				{
 					spriteBatch = sb;
 					inventory = inv;
@@ -61,17 +61,8 @@ namespace BaroMod_sjx
 
 			private static Sprite? GetTargetSprite(ConditionStorage conditionStorage, Inventory iv)
 			{
-				Inventory.ItemSlot target_slot;
-				{
-					Inventory.ItemSlot[] slots = (AccessTools.Field(typeof(Inventory), "slots").GetValue(iv)! as Inventory.ItemSlot[])!;
-					if (conditionStorage.slotIndex >= slots.Length)
-					{
-						DebugConsole.LogError($"ConditionStorage of {(iv.Owner as Item)!.Prefab.Identifier} specified index {conditionStorage.slotIndex} out of {slots.Length}!");
-						return null;
-					}
-					target_slot = slots[conditionStorage.slotIndex];
-				}
-				if (target_slot.Any())
+				Inventory.ItemSlot? target_slot = conditionStorage.GetSlot();
+				if (target_slot != null && target_slot.Any())
 				{
 					Item i = target_slot.First();
 					return i.Prefab.InventoryIcon ?? i.Sprite;
@@ -82,13 +73,13 @@ namespace BaroMod_sjx
 				}
 			}
 
-			public static bool Prefix(out context? __state,
+			public static bool Prefix(out Context? __state,
 				SpriteBatch spriteBatch, Inventory inventory, VisualSlot slot, Item item, int slotIndex)
 			{
-				if (inventory != null && item != null && get_componentsByType(item).TryGetValue(typeof(ConditionStorage), out List<ItemComponent>? comps))
+				if (inventory != null && item != null)
 				{
-					ConditionStorage conditionStorage = (comps.First() as ConditionStorage)!;
-					if (!conditionStorage.showIcon && !conditionStorage.showCount)
+					ConditionStorage? conditionStorage = item.GetComponent<ConditionStorage>();
+					if (conditionStorage == null || !conditionStorage.showIcon && !conditionStorage.showCount)
 					{
 						__state = null;
 						return true;
@@ -193,7 +184,7 @@ namespace BaroMod_sjx
 						spriteColor = Color.White;
 					}
 					Vector2 center = rect.Center.ToVector2() + (new Vector2(conditionStorage.iconShiftX, conditionStorage.iconShiftY)) * slot.Rect.Size.ToVector2() * 0.5f;
-					__state = new context(spriteBatch, inventory, indicatorSprite, emptyIndicatorSprite, item_sprite,
+					__state = new Context(spriteBatch, inventory, indicatorSprite, emptyIndicatorSprite, item_sprite,
 						conditionIndicatorArea, conditionStorage.maxItemCount, conditionStorage.currentItemCount, center,
 							scale * conditionStorage.iconScale, rotation, spriteColor);
 				}
@@ -203,7 +194,7 @@ namespace BaroMod_sjx
 				}
 				return true;
 			}
-			public static void Postfix(context? __state)
+			public static void Postfix(Context? __state)
 			{
 				if (__state != null)
 				{
@@ -224,11 +215,10 @@ namespace BaroMod_sjx
 
 	partial class ConditionStorage : ItemComponent, IServerSerializable
 	{
-		private CoroutineHandle? resetPredictionCoroutine = null;
-		private int? last_server_update_count = null;
-		private float resetPredictionTimer = 1.0f;
-
 		float last_update_time = 0;
+		private int? last_server_update_count = null;
+		/*private CoroutineHandle? resetPredictionCoroutine = null;
+		private float resetPredictionTimer = 1.0f;
 
 		const double remove_time = 1.0;
 
@@ -303,7 +293,7 @@ namespace BaroMod_sjx
 			if (last_server_update_count.HasValue) { SetItemCount(last_server_update_count.Value, false); }
 			resetPredictionCoroutine = null;
 			yield return CoroutineStatus.Success;
-		}
+		}*/
 
 		public void ClientEventRead(IReadMessage msg, float sendingTime)
 		{

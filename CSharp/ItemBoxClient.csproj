@@ -32,7 +32,10 @@
       <HintPath>..\Refs\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Barotrauma">
-      <HintPath>..\Refs\Client\Barotrauma.dll</HintPath>
+      <HintPath>..\Refs\Windows\Barotrauma.dll</HintPath>
+    </Reference>
+    <Reference Include="BarotraumaCore">
+      <HintPath>..\Refs\Windows\BarotraumaCore.dll</HintPath>
     </Reference>
     <Reference Include="MonoGame.Framework.Windows.NetStandard">
       <HintPath>..\Refs\MonoGame.Framework.Windows.NetStandard.dll</HintPath>

@@ -48,6 +48,11 @@ namespace BaroMod_sjx
 			yield return CoroutineStatus.Success;
 		}*/
 
+		partial void CreateSyncItemCountEvent()
+		{
+			Item.CreateServerEvent(this, new EventData(currentItemCount));
+		}
+
 		public void ServerEventWrite(IWriteMessage msg, Client c, NetEntityEvent.IData? extraData = null)
 		{
 			EventData eventData = ExtractEventData<EventData>(extraData);
